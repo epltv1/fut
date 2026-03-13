@@ -23,27 +23,31 @@ client.on('interactionCreate', async interaction => {
         await interaction.deferReply({ ephemeral: true });
 
         try {
-            // Fetch directly from your Gist
             const response = await axios.get(GIST_URL);
             const data = response.data;
             const streams = data.streams[0].streams;
 
             for (const s of streams) {
+                // Convert ISO date string to Unix timestamp (seconds)
+                const date = new Date(s.starts_at);
+                const timestamp = Math.floor(date.getTime() / 1000);
+
                 const embed = new EmbedBuilder()
                     .setTitle(s.name)
                     .setImage(s.poster)
                     .addFields(
-                        { name: 'Start Time', value: s.starts_at, inline: true },
-                        { name: 'Stream Link', value: `[Watch Now](${s.streams[0].url})`, inline: true }
+                        { name: 'Category', value: data.streams[0].category, inline: true },
+                        { name: 'Countdown', value: `<t:${timestamp}:R>`, inline: true },
+                        { name: 'Stream', value: `[Watch Now](${s.streams[0].url})`, inline: true }
                     )
                     .setColor(0x0099ff);
                 
                 await interaction.channel.send({ embeds: [embed] });
             }
-            await interaction.editReply({ content: '✅ Schedule posted successfully!' });
+            await interaction.editReply({ content: '✅ Schedule posted!' });
         } catch (e) {
             console.error(e);
-            await interaction.editReply({ content: '❌ Failed to fetch schedule from Gist.' });
+            await interaction.editReply({ content: '❌ Failed to fetch schedule.' });
         }
     }
 });
