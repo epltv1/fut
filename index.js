@@ -3,7 +3,7 @@ const axios = require('axios');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-// Your Gist Raw URL
+// Your Raw Gist URL
 const GIST_URL = 'https://gist.githubusercontent.com/epltv1/cc21ac2b76f1b03da87bb81442230ce9/raw/cfd7d20861f5c07b6b4fb7206b3a4565555962c2/schedule.json';
 
 const command = new SlashCommandBuilder()
@@ -35,19 +35,19 @@ client.on('interactionCreate', async interaction => {
                 const embed = new EmbedBuilder()
                     .setTitle(s.name)
                     .setImage(s.poster)
+                    .setColor(0x0099ff)
                     .addFields(
-                        { name: 'Category', value: data.streams[0].category, inline: true },
-                        { name: 'Countdown', value: `<t:${timestamp}:R>`, inline: true },
-                        { name: 'Stream', value: `[Watch Now](${s.streams[0].url})`, inline: true }
-                    )
-                    .setColor(0x0099ff);
+                        // The :R tag creates the live countdown
+                        { name: 'Starts', value: `<t:${timestamp}:R>`, inline: true },
+                        { name: 'Watch', value: `[Link](${s.streams[0].url})`, inline: true }
+                    );
                 
                 await interaction.channel.send({ embeds: [embed] });
             }
-            await interaction.editReply({ content: '✅ Schedule posted!' });
+            await interaction.editReply({ content: '✅ Schedule posted successfully!' });
         } catch (e) {
             console.error(e);
-            await interaction.editReply({ content: '❌ Failed to fetch schedule.' });
+            await interaction.editReply({ content: '❌ Failed to fetch schedule from Gist.' });
         }
     }
 });
