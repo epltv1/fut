@@ -1,11 +1,14 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const axios = require('axios');
+
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+// Your Gist Raw URL
+const GIST_URL = 'https://gist.githubusercontent.com/epltv1/cc21ac2b76f1b03da87bb81442230ce9/raw/cfd7d20861f5c07b6b4fb7206b3a4565555962c2/schedule.json';
 
 const command = new SlashCommandBuilder()
     .setName('schedule')
-    .setDescription('Post a stream schedule')
-    .addStringOption(option => option.setName('category').setDescription('The sport name').setRequired(true))
-    .addStringOption(option => option.setName('json').setDescription('Paste your JSON here').setRequired(true));
+    .setDescription('Post the current stream schedule');
 
 client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -15,16 +18,34 @@ client.once('ready', async () => {
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
-    const jsonString = interaction.options.getString('json');
-    try {
-        const data = JSON.parse(jsonString);
-        const streams = data.streams[0].streams;
-        for (const s of streams) {
-            const embed = new EmbedBuilder().setTitle(s.name).setImage(s.poster).addFields({ name: 'Start', value: s.starts_at });
-            await interaction.channel.send({ embeds: [embed] });
+
+    if (interaction.commandName === 'schedule') {
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+            // Fetch directly from your Gist
+            const response = await axios.get(GIST_URL);
+            const data = response.data;
+            const streams = data.streams[0].streams;
+
+            for (const s of streams) {
+                const embed = new EmbedBuilder()
+                    .setTitle(s.name)
+                    .setImage(s.poster)
+                    .addFields(
+                        { name: 'Start Time', value: s.starts_at, inline: true },
+                        { name: 'Stream Link', value: `[Watch Now](${s.streams[0].url})`, inline: true }
+                    )
+                    .setColor(0x0099ff);
+                
+                await interaction.channel.send({ embeds: [embed] });
+            }
+            await interaction.editReply({ content: '✅ Schedule posted successfully!' });
+        } catch (e) {
+            console.error(e);
+            await interaction.editReply({ content: '❌ Failed to fetch schedule from Gist.' });
         }
-        await interaction.reply({ content: 'Posted!', ephemeral: true });
-    } catch (e) { await interaction.reply({ content: 'Invalid JSON', ephemeral: true }); }
+    }
 });
 
 client.login(process.env.DISCORD_TOKEN);
