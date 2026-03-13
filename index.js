@@ -8,47 +8,51 @@ const GIST_URL = 'https://gist.githubusercontent.com/epltv1/cc21ac2b76f1b03da87b
 
 const command = new SlashCommandBuilder()
     .setName('schedule')
-    .setDescription('Post the current stream schedule');
+    .setDescription('Post the live stream schedule');
 
 client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     await rest.put(Routes.applicationCommands(client.user.id), { body: [command.toJSON()] });
-    console.log('Bot is online and command registered!');
+    console.log('Bot is online!');
 });
 
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
+    if (!interaction.isChatInputCommand() || interaction.commandName !== 'schedule') return;
+    await interaction.deferReply({ ephemeral: true });
 
-    if (interaction.commandName === 'schedule') {
-        await interaction.deferReply({ ephemeral: true });
+    try {
+        const response = await axios.get(GIST_URL);
+        const streams = response.data.streams[0].streams;
+        const now = new Date().getTime();
 
-        try {
-            const response = await axios.get(GIST_URL);
-            const data = response.data;
-            const streams = data.streams[0].streams;
+        for (const s of streams) {
+            const startDate = new Date(s.starts_at).getTime();
+            const endDate = new Date(s.ends_at).getTime();
 
-            for (const s of streams) {
-                // Convert ISO date string to Unix timestamp (seconds)
-                const date = new Date(s.starts_at);
-                const timestamp = Math.floor(date.getTime() / 1000);
+            // Auto-delete check: If the event already finished, skip it
+            if (now > endDate) continue;
 
-                const embed = new EmbedBuilder()
-                    .setTitle(s.name)
-                    .setImage(s.poster)
-                    .setColor(0x0099ff)
-                    .addFields(
-                        // The :R tag creates the live countdown
-                        { name: 'Starts', value: `<t:${timestamp}:R>`, inline: true },
-                        { name: 'Watch', value: `[Link](${s.streams[0].url})`, inline: true }
-                    );
-                
-                await interaction.channel.send({ embeds: [embed] });
-            }
-            await interaction.editReply({ content: '✅ Schedule posted successfully!' });
-        } catch (e) {
-            console.error(e);
-            await interaction.editReply({ content: '❌ Failed to fetch schedule from Gist.' });
+            const startTimestamp = Math.floor(startDate / 1000);
+
+            const embed = new EmbedBuilder()
+                .setTitle(s.name)
+                .setColor(0x0099ff)
+                .addFields(
+                    { name: 'Starts', value: `<t:${startTimestamp}:R>`, inline: true },
+                    { name: 'Watch', value: `[Link](${s.streams[0].url})`, inline: true }
+                );
+
+            const msg = await interaction.channel.send({ embeds: [embed] });
+
+            // Auto-delete after event ends
+            const timeUntilEnd = endDate - now;
+            setTimeout(async () => {
+                try { await msg.delete(); } catch (err) { console.error("Could not delete message"); }
+            }, timeUntilEnd);
         }
+        await interaction.editReply('✅ Schedule posted!');
+    } catch (e) {
+        await interaction.editReply('❌ Error fetching schedule.');
     }
 });
 
